@@ -6,6 +6,7 @@ import AuthForm from './components/AuthForm';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [editableBlog, setEditableBlog] = useState(null);
+  // useRef to hold the refresh function coming from BlogList
   const refreshBlogsRef = useRef(null);
 
   if (!token) {

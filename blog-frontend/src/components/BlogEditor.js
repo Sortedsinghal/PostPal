@@ -3,8 +3,6 @@ import axios from 'axios';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
-const endpoint = process.env.REACT_APP_API_BASE_URL;
-
 const BlogEditor = ({ existingBlog, token, onRefresh }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -12,15 +10,22 @@ const BlogEditor = ({ existingBlog, token, onRefresh }) => {
   const [statusMsg, setStatusMsg] = useState('');
   const [draftId, setDraftId] = useState(null);
 
+  const headers = {
+    headers: { Authorization: `Bearer ${token}` }
+  };
+
+  // When editing an existing draft, prefill the fields
   useEffect(() => {
     if (existingBlog) {
-      setTitle(existingBlog.title);
-      setContent(existingBlog.content);
-      setTags(existingBlog.tags.join(', '));
-      setDraftId(existingBlog._id);
+      setTitle(existingBlog.title || '');
+      setContent(existingBlog.content || '');
+      setTags((existingBlog.tags || []).join(', '));
+      setDraftId(existingBlog._id || null);
+      setStatusMsg('Editing draft...');
     }
   }, [existingBlog]);
 
+  // Auto-save after 5 seconds of inactivity
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (title || content) handleAutoSave();
@@ -30,37 +35,39 @@ const BlogEditor = ({ existingBlog, token, onRefresh }) => {
 
   const handleAutoSave = async () => {
     try {
-      const res = await axios.post(`${endpoint}/blogs/save-draft`, {
+      const API_BASE = process.env.REACT_APP_API_URL;
+      const response = await axios.post(`${API_BASE}/api/blogs/save-draft`, {
         id: draftId,
         title,
         content,
         tags: tags.split(',').map(t => t.trim())
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDraftId(res.data._id);
+      }, headers);
+      setDraftId(response.data._id);
       setStatusMsg('Auto-saved at ' + new Date().toLocaleTimeString());
+      onRefresh && onRefresh();
     } catch (err) {
       setStatusMsg('Auto-save failed');
+      console.error(err);
     }
   };
 
   const handlePublish = async () => {
     try {
-      await axios.post(`${endpoint}/blogs/publish`, {
+      await axios.post(`${API_BASE}/api/blogs/publish`,   {
         title,
         content,
         tags: tags.split(',').map(t => t.trim())
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      }, headers);
+      setStatusMsg('Published successfully!');
+      // Clear the editor fields after publishing
       setTitle('');
       setContent('');
       setTags('');
-      setStatusMsg('Published successfully!');
-      if (onRefresh) onRefresh();
+      setDraftId(null);
+      onRefresh && onRefresh();
     } catch (err) {
       setStatusMsg('Publish failed');
+      console.error(err);
     }
   };
 
@@ -75,6 +82,7 @@ const BlogEditor = ({ existingBlog, token, onRefresh }) => {
         className="w-full p-2 border mb-3 rounded"
       />
       <ReactQuill
+        theme="snow"
         value={content}
         onChange={setContent}
         className="mb-3"
@@ -87,8 +95,12 @@ const BlogEditor = ({ existingBlog, token, onRefresh }) => {
         className="w-full p-2 border mb-3 rounded"
       />
       <div className="flex justify-between">
-        <button onClick={handleAutoSave} className="bg-gray-300 px-4 py-2 rounded">Save Draft</button>
-        <button onClick={handlePublish} className="bg-blue-600 text-white px-4 py-2 rounded">Publish</button>
+        <button onClick={handleAutoSave} className="bg-gray-300 px-4 py-2 rounded">
+          Save Draft
+        </button>
+        <button onClick={handlePublish} className="bg-blue-600 text-white px-4 py-2 rounded">
+          Publish
+        </button>
       </div>
       {statusMsg && <p className="mt-2 text-green-600">{statusMsg}</p>}
     </div>
